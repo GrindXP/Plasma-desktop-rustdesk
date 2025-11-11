@@ -116,38 +116,45 @@ jobs:
         run: |
           export DISPLAY=:0
           
-          echo "⚙️ Configuring RustDesk (passwordless auto-accept mode)..."
+          echo "⚙️ Configuring RustDesk with unattended access..."
           
-          # Verify key secret exists
-          if [ -z "$RUSTDESK_KEY" ]; then
-            echo "❌ ERROR: RUSTDESK_KEY secret not found!"
-            exit 1
-          fi
-          
-          # Create config directory
           mkdir -p ~/.config/rustdesk
           
-          # Create config with auto-accept (no password needed)
+          # Create config file
           cat > ~/.config/rustdesk/RustDesk2.toml << EOF
           [options]
           custom-rendezvous-server = "159.195.6.61"
           relay-server = "159.195.6.61"
           api-server = ""
           key = "$RUSTDESK_KEY"
+          enable-keyboard = true
+          enable-clipboard = true
+          enable-file-transfer = true
+          enable-audio = true
           
           [access_mode]
-          accept-connections = "always"
+          view = "always"
+          control = "always"
           EOF
-          
-          echo "✅ Config created - passwordless auto-accept enabled"
           
           # Start RustDesk
           rustdesk &
-          
           sleep 10
           
-          # Get ID
-          RUSTDESK_ID=$(rustdesk --get-id 2>/dev/null || echo "Initializing...")
+          # Configure for unattended access
+          rustdesk --option enable-keyboard Y
+          rustdesk --option enable-clipboard Y  
+          rustdesk --option enable-file-transfer Y
+          rustdesk --option enable-audio Y
+          rustdesk --option allow-always-connect Y
+          rustdesk --option allow-remote-config-modification Y
+          
+          # Set simple password as fallback
+          rustdesk --password ""
+          
+          sleep 3
+          
+          RUSTDESK_ID=$(rustdesk --get-id 2>/dev/null || echo "Unknown")
           
           echo ""
           echo "╔═══════════════════════════════════════════════════════╗"
@@ -155,21 +162,18 @@ jobs:
           echo "╠═══════════════════════════════════════════════════════╣"
           echo "║                                                       ║"
           echo "║  🆔 RustDesk ID: $RUSTDESK_ID"
-          echo "║  🔓 Password: NONE (Auto-Accept Enabled)              ║"
+          echo "║  🔓 Password: Try EMPTY or press Connect directly     ║"
           echo "║  🌐 Server: 159.195.6.61                              ║"
           echo "║  🖥️  Desktop: KDE Plasma (Xvfb)                        ║"
           echo "║                                                       ║"
           echo "║  📱 Android SDK: /mnt/storage/android-sdk             ║"
           echo "║                                                       ║"
-          echo "║  ⚡ CONNECTION INSTRUCTIONS:                          ║"
-          echo "║     1. Enter ID: $RUSTDESK_ID"
-          echo "║     2. Tap Connect button                             ║"
-          echo "║     3. NO password needed - auto connects!            ║"
-          echo "║                                                       ║"
           echo "║  🔌 Android App Settings:                             ║"
           echo "║     • ID Server: 159.195.6.61                         ║"
           echo "║     • Relay Server: 159.195.6.61                      ║"
           echo "║     • Key: (from RUSTDESK_KEY secret)                 ║"
+          echo "║                                                       ║"
+          echo "║  💡 Leave password field BLANK and tap Connect!       ║"
           echo "║                                                       ║"
           echo "╚═══════════════════════════════════════════════════════╝"
           echo ""
