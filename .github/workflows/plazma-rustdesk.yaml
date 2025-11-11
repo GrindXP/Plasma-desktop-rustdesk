@@ -114,19 +114,20 @@ jobs:
         run: |
           export DISPLAY=:0
           
-          echo "⚙️ Configuring RustDesk..."
+          echo "⚙️ Configuring RustDesk for direct connection (no password)..."
           
           # Create config directory
           mkdir -p ~/.config/rustdesk
           
-          # Create config file with custom server AND permanent password
+          # Create config file with direct access enabled
           cat > ~/.config/rustdesk/RustDesk2.toml << 'EOF'
           [options]
           custom-rendezvous-server = "159.195.6.61"
           relay-server = "159.195.6.61"
           api-server = ""
           key = "kNZ9rGBAVPtperuSNtuKZN2ooRGQIYSjDbbx1dXIM5I="
-          permanent-password = "github123"
+          direct-server = true
+          direct-access-port = "21118"
           EOF
           
           # Start RustDesk
@@ -143,7 +144,7 @@ jobs:
           echo "╠═══════════════════════════════════════════════════════╣"
           echo "║                                                       ║"
           echo "║  🆔 RustDesk ID: $RUSTDESK_ID"
-          echo "║  🔑 Password: github123                               ║"
+          echo "║  🔓 Password: NONE (Direct Connection)                ║"
           echo "║  🌐 Server: 159.195.6.61                              ║"
           echo "║  🖥️  Desktop: KDE Plasma (Xvfb)                        ║"
           echo "║                                                       ║"
@@ -154,6 +155,9 @@ jobs:
           echo "║     • ID Server: 159.195.6.61                         ║"
           echo "║     • Relay Server: 159.195.6.61                      ║"
           echo "║     • Key: kNZ9rGBAVPtperuSNtuKZN2ooRGQIYSjDbbx1dXIM5I= ║"
+          echo "║                                                       ║"
+          echo "║  ⚠️  Connect without entering any password!           ║"
+          echo "║     Just tap Connect button after entering ID         ║"
           echo "║                                                       ║"
           echo "╚═══════════════════════════════════════════════════════╝"
           echo ""
