@@ -119,21 +119,18 @@ jobs:
           # Create config directory
           mkdir -p ~/.config/rustdesk
           
-          # Create config file with custom server
+          # Create config file with custom server AND permanent password
           cat > ~/.config/rustdesk/RustDesk2.toml << 'EOF'
           [options]
           custom-rendezvous-server = "159.195.6.61"
           relay-server = "159.195.6.61"
           api-server = ""
           key = "kNZ9rGBAVPtperuSNtuKZN2ooRGQIYSjDbbx1dXIM5I="
+          permanent-password = "github123"
           EOF
-          
-          # Set password
-          rustdesk --password "123456"
           
           # Start RustDesk
           rustdesk &
-          RUSTDESK_PID=$!
           
           sleep 10
           
@@ -146,20 +143,17 @@ jobs:
           echo "╠═══════════════════════════════════════════════════════╣"
           echo "║                                                       ║"
           echo "║  🆔 RustDesk ID: $RUSTDESK_ID"
-          echo "║  🔑 Password: 123456                                  ║"
+          echo "║  🔑 Password: github123                               ║"
           echo "║  🌐 Server: 159.195.6.61                              ║"
           echo "║  🖥️  Desktop: KDE Plasma (Xvfb)                        ║"
           echo "║                                                       ║"
           echo "║  📱 Android SDK: /mnt/storage/android-sdk             ║"
-          echo "║  💡 Android Studio: Download inside session           ║"
+          echo "║  💡 Download Android Studio inside session            ║"
           echo "║                                                       ║"
           echo "║  🔌 Android App Configuration:                        ║"
           echo "║     • ID Server: 159.195.6.61                         ║"
           echo "║     • Relay Server: 159.195.6.61                      ║"
           echo "║     • Key: kNZ9rGBAVPtperuSNtuKZN2ooRGQIYSjDbbx1dXIM5I= ║"
-          echo "║                                                       ║"
-          echo "║  📥 To download Android Studio inside session:        ║"
-          echo "║     cd /mnt/storage && wget https://redirector.gvt1.com/edgedl/android/studio/ide-zips/2025.2.1.7/android-studio-2025.2.1.7-linux.tar.gz && tar -xzf android-studio-*.tar.gz ║"
           echo "║                                                       ║"
           echo "╚═══════════════════════════════════════════════════════╝"
           echo ""
