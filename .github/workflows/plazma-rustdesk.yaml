@@ -21,7 +21,7 @@ jobs:
           mkdir -p /mnt/storage/android-sdk
           mkdir -p /mnt/storage/android-avd
           df -h /mnt
-          
+
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -44,7 +44,8 @@ jobs:
             fonts-noto-color-emoji \
             wget curl net-tools htop \
             openjdk-17-jdk unzip cpu-checker \
-            xvfb x11-xserver-utils
+            xvfb x11-xserver-utils \
+            libfuse2
           echo "✅ KDE Plasma installed"
 
       - name: Install Android SDK
@@ -86,20 +87,28 @@ jobs:
           tar -xzf android-studio.tar.gz && rm android-studio.tar.gz
           echo "✅ Android Studio extracted"
 
-      - name: Install RustDesk
+      - name: Download and Setup RustDesk AppImage
         run: |
-          echo "🦀 Installing RustDesk..."
-          wget -q https://github.com/rustdesk/rustdesk/releases/download/1.3.3/rustdesk-1.3.3-x86_64.deb -O rustdesk.deb
-          sudo apt install -y ./rustdesk.deb
-          rm rustdesk.deb
-          echo "✅ RustDesk installed"
+          echo "🦀 Downloading RustDesk AppImage..."
+          cd /tmp
+          
+          # Download RustDesk AppImage
+          wget -q https://github.com/rustdesk/rustdesk/releases/download/1.3.3/rustdesk-1.3.3-x86_64.AppImage -O rustdesk.AppImage
+          
+          chmod +x rustdesk.AppImage
+          
+          # Extract AppImage
+          ./rustdesk.AppImage --appimage-extract
+          
+          # Move to /opt
+          sudo mv squashfs-root /opt/rustdesk
+          
+          echo "✅ RustDesk AppImage extracted to /opt/rustdesk"
 
       - name: Start Virtual Display
         run: |
           echo "🖥️ Starting virtual display..."
-          # Start Xvfb on display :0
           Xvfb :0 -screen 0 1920x1080x24 &
-          export DISPLAY=:0
           sleep 3
           echo "✅ Virtual display started on :0"
 
@@ -113,55 +122,52 @@ jobs:
           # Start D-Bus
           eval $(dbus-launch --sh-syntax)
           
-          # Start Plasma in background
+          # Start Plasma
           startplasma-x11 &
           sleep 5
           echo "✅ KDE Plasma started"
 
-      - name: Configure and Start RustDesk
+      - name: Start RustDesk with Custom Server
         run: |
           export DISPLAY=:0
           
-          echo "⚙️ Configuring RustDesk..."
+          echo "⚙️ Starting RustDesk with custom server..."
           
-          # Create RustDesk config directory
+          # Create config directory
           mkdir -p ~/.config/rustdesk
           
-          # Create config file with custom server
+          # Write config file
           cat > ~/.config/rustdesk/RustDesk2.toml << 'EOFCONFIG'
           [options]
-          custom-rendezvous-server = '159.195.6.61'
-          relay-server = '159.195.6.61'
+          custom-rendezvous-server = '159.195.6.61:21116'
+          relay-server = '159.195.6.61:21117'
           api-server = ''
           key = 'kNZ9rGBAVPtperuSNtuKZN2ooRGQIYSjDbbx1dXIM5I='
           EOFCONFIG
           
-          # Set password
-          echo "${{ secrets.RUSTDESK_PASSWORD }}" | rustdesk --password
+          # Start RustDesk with custom server parameters
+          /opt/rustdesk/usr/bin/rustdesk \
+            --server 159.195.6.61:21116 \
+            --password "${{ secrets.RUSTDESK_PASSWORD }}" &
           
-          # Start RustDesk service
-          rustdesk --service &
-          
-          sleep 5
+          sleep 10
           
           # Get RustDesk ID
-          RUSTDESK_ID=$(rustdesk --get-id 2>/dev/null || echo "Getting ID...")
+          RUSTDESK_ID=$(/opt/rustdesk/usr/bin/rustdesk --get-id 2>/dev/null || echo "Initializing...")
           
           echo ""
           echo "╔═══════════════════════════════════════════════════════╗"
-          echo "║  🦀 RUSTDESK CONNECTION READY! 🦀                     ║"
+          echo "║  🦀 RUSTDESK + KDE PLASMA READY! 🦀                   ║"
           echo "╠═══════════════════════════════════════════════════════╣"
           echo "║                                                       ║"
           echo "║  🆔 RustDesk ID: $RUSTDESK_ID"
-          echo "║  🔑 Password: (from secrets.RUSTDESK_PASSWORD)        ║"
-          echo "║  🌐 Server: 159.195.6.61                              ║"
-          echo "║  🖥️  Desktop: KDE Plasma (Xvfb)                        ║"
+          echo "║  🔑 Password: (from GitHub Secrets)                   ║"
+          echo "║  🌐 Custom Server: 159.195.6.61                       ║"
+          echo "║  🖥️  Desktop: KDE Plasma on Xvfb                       ║"
           echo "║                                                       ║"
-          echo "║  📱 Android Studio: 2025.2.1                          ║"
-          echo "║  📂 Location: /mnt/storage/android-studio/bin/studio.sh ║"
+          echo "║  📱 Android Studio: /mnt/storage/android-studio       ║"
           echo "║                                                       ║"
-          echo "║  🔌 Android App Configuration:                        ║"
-          echo "║     Settings → Network:                               ║"
+          echo "║  🔌 Android App Settings:                             ║"
           echo "║     • ID Server: 159.195.6.61                         ║"
           echo "║     • Relay Server: 159.195.6.61                      ║"
           echo "║     • Key: kNZ9rGBAVPtperuSNtuKZN2ooRGQIYSjDbbx1dXIM5I= ║"
@@ -171,7 +177,8 @@ jobs:
 
       - name: Keep Alive with Monitoring
         run: |
-          echo "🟢 SESSION ACTIVE"
+          echo "🟢 SESSION ACTIVE - Running for up to 6 hours"
+          echo ""
           
           COUNT=0
           while true; do
@@ -181,20 +188,22 @@ jobs:
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             
             # Check RustDesk
-            if pgrep -f "rustdesk" > /dev/null; then
+            if pgrep -f "/opt/rustdesk.*rustdesk" > /dev/null; then
               echo "✅ RustDesk: Running"
-              RUSTDESK_ID=$(rustdesk --get-id 2>/dev/null || echo "Unknown")
+              RUSTDESK_ID=$(/opt/rustdesk/usr/bin/rustdesk --get-id 2>/dev/null || echo "Unknown")
               echo "🆔 Current ID: $RUSTDESK_ID"
             else
               echo "⚠️  RustDesk: Restarting..."
               export DISPLAY=:0
-              rustdesk --service &
+              /opt/rustdesk/usr/bin/rustdesk \
+                --server 159.195.6.61:21116 \
+                --password "${{ secrets.RUSTDESK_PASSWORD }}" &
               sleep 3
             fi
             
             # Check Xvfb
             if pgrep -f "Xvfb.*:0" > /dev/null; then
-              echo "✅ Display Server: Running"
+              echo "✅ Display Server: Running (Xvfb)"
             else
               echo "⚠️  Display: Restarting..."
               Xvfb :0 -screen 0 1920x1080x24 &
@@ -206,7 +215,12 @@ jobs:
               echo "✅ KDE Plasma: Running"
             fi
             
-            # Resources
+            # Check Android Studio
+            if pgrep -f "android-studio" > /dev/null; then
+              echo "📱 Android Studio: Running"
+            fi
+            
+            # System resources
             echo "💾 Root: $(df -h / | tail -1 | awk '{print $5 " used"}')"
             echo "💾 /mnt: $(df -h /mnt | tail -1 | awk '{print $5 " used (" $4 " free)"}')"
             echo "🧠 Memory: $(free -h | grep Mem | awk '{print $3 "/" $2}')"
@@ -214,5 +228,5 @@ jobs:
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo ""
             
-            sleep 180
+            sleep 180  # Check every 3 minutes
           done
