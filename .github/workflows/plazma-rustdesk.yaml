@@ -119,20 +119,20 @@ jobs:
           
           echo "⚙️ Configuring RustDesk..."
           
-          # Verify secrets exist
+          # Verify secrets
           if [ -z "$RUSTDESK_KEY" ]; then
-            echo "❌ ERROR: RUSTDESK_KEY secret not found!"
+            echo "❌ ERROR: RUSTDESK_KEY not found!"
             exit 1
           fi
           
           if [ -z "$RUSTDESK_PASSWORD" ]; then
-            echo "⚠️  WARNING: RUSTDESK_PASSWORD not set, using default"
-            RUSTDESK_PASSWORD="password123"
+            echo "❌ ERROR: RUSTDESK_PASSWORD not found!"
+            exit 1
           fi
           
           mkdir -p ~/.config/rustdesk
           
-          # Create simple config file
+          # Create config file
           cat > ~/.config/rustdesk/RustDesk2.toml << EOF
           [options]
           custom-rendezvous-server = "159.195.6.61"
@@ -144,8 +144,16 @@ jobs:
           
           # Start RustDesk
           rustdesk &
+          RUSTDESK_PID=$!
           
-          sleep 10
+          echo "⏳ Waiting for RustDesk to initialize (15 seconds)..."
+          sleep 15
+          
+          # Set password after RustDesk is running
+          echo "🔐 Setting password..."
+          echo "$RUSTDESK_PASSWORD" | rustdesk --password
+          
+          sleep 3
           
           # Get ID
           RUSTDESK_ID=$(rustdesk --get-id 2>/dev/null || echo "Unknown")
@@ -156,7 +164,7 @@ jobs:
           echo "╠═══════════════════════════════════════════════════════╣"
           echo "║                                                       ║"
           echo "║  🆔 RustDesk ID: $RUSTDESK_ID"
-          echo "║  🔑 Password: (from RUSTDESK_PASSWORD secret)         ║"
+          echo "║  🔑 Password: Rustdesk2024                            ║"
           echo "║  🌐 Server: 159.195.6.61                              ║"
           echo "║  🖥️  Desktop: KDE Plasma (Xvfb)                        ║"
           echo "║                                                       ║"
@@ -165,10 +173,9 @@ jobs:
           echo "║  🔌 Android App Configuration:                        ║"
           echo "║     • ID Server: 159.195.6.61                         ║"
           echo "║     • Relay Server: 159.195.6.61                      ║"
-          echo "║     • Key: $RUSTDESK_KEY                              ║"
+          echo "║     • Key: kNZ9rGBAVPtperuSNtuKZN2ooRGQIYSjDbbx1dXIM5I= ║"
           echo "║                                                       ║"
-          echo "║  💡 Try connecting with the password from your        ║"
-          echo "║     RUSTDESK_PASSWORD GitHub secret                   ║"
+          echo "║  ✅ USE PASSWORD: Rustdesk2024                        ║"
           echo "║                                                       ║"
           echo "╚═══════════════════════════════════════════════════════╝"
           echo ""
