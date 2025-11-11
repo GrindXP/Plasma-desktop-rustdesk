@@ -111,29 +111,52 @@ jobs:
           echo "✅ KDE Plasma started"
 
       - name: Configure and Start RustDesk
+        env:
+          RUSTDESK_KEY: ${{ secrets.RUSTDESK_KEY }}
+          RUSTDESK_PASSWORD: ${{ secrets.RUSTDESK_PASSWORD }}
         run: |
           export DISPLAY=:0
           
-          echo "⚙️ Configuring RustDesk for direct connection (no password)..."
+          echo "⚙️ Configuring RustDesk with secrets..."
+          
+          # Verify secrets are loaded
+          if [ -z "$RUSTDESK_KEY" ]; then
+            echo "❌ ERROR: RUSTDESK_KEY secret not found!"
+            exit 1
+          fi
+          
+          if [ -z "$RUSTDESK_PASSWORD" ]; then
+            echo "⚠️  WARNING: RUSTDESK_PASSWORD not set, will try without password"
+            RUSTDESK_PASSWORD="no-password"
+          fi
           
           # Create config directory
           mkdir -p ~/.config/rustdesk
           
-          # Create config file with direct access enabled
-          cat > ~/.config/rustdesk/RustDesk2.toml << 'EOF'
+          # Create config file using secrets
+          cat > ~/.config/rustdesk/RustDesk2.toml << EOF
           [options]
           custom-rendezvous-server = "159.195.6.61"
           relay-server = "159.195.6.61"
           api-server = ""
-          key = "kNZ9rGBAVPtperuSNtuKZN2ooRGQIYSjDbbx1dXIM5I="
-          direct-server = true
-          direct-access-port = "21118"
+          key = "$RUSTDESK_KEY"
           EOF
+          
+          echo "✅ Config created with key from secrets"
           
           # Start RustDesk
           rustdesk &
+          RUSTDESK_PID=$!
           
-          sleep 10
+          sleep 5
+          
+          # Set password after startup
+          if [ "$RUSTDESK_PASSWORD" != "no-password" ]; then
+            echo "Setting password from secrets..."
+            rustdesk --password "$RUSTDESK_PASSWORD"
+          fi
+          
+          sleep 5
           
           # Get ID
           RUSTDESK_ID=$(rustdesk --get-id 2>/dev/null || echo "Initializing...")
@@ -144,20 +167,17 @@ jobs:
           echo "╠═══════════════════════════════════════════════════════╣"
           echo "║                                                       ║"
           echo "║  🆔 RustDesk ID: $RUSTDESK_ID"
-          echo "║  🔓 Password: NONE (Direct Connection)                ║"
+          echo "║  🔑 Password: (from RUSTDESK_PASSWORD secret)         ║"
           echo "║  🌐 Server: 159.195.6.61                              ║"
+          echo "║  🔐 Key: (from RUSTDESK_KEY secret)                   ║"
           echo "║  🖥️  Desktop: KDE Plasma (Xvfb)                        ║"
           echo "║                                                       ║"
           echo "║  📱 Android SDK: /mnt/storage/android-sdk             ║"
-          echo "║  💡 Download Android Studio inside session            ║"
           echo "║                                                       ║"
           echo "║  🔌 Android App Configuration:                        ║"
           echo "║     • ID Server: 159.195.6.61                         ║"
           echo "║     • Relay Server: 159.195.6.61                      ║"
-          echo "║     • Key: kNZ9rGBAVPtperuSNtuKZN2ooRGQIYSjDbbx1dXIM5I= ║"
-          echo "║                                                       ║"
-          echo "║  ⚠️  Connect without entering any password!           ║"
-          echo "║     Just tap Connect button after entering ID         ║"
+          echo "║     • Key: (use RUSTDESK_KEY from your secrets)       ║"
           echo "║                                                       ║"
           echo "╚═══════════════════════════════════════════════════════╝"
           echo ""
@@ -208,5 +228,5 @@ jobs:
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo ""
             
-            sleep 180  # Check every 3 minutes
+            sleep 180
           done
