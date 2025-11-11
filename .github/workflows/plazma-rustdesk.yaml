@@ -1,0 +1,315 @@
+name: KDE Plasma Desktop with RustDesk & Android Studio
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  kde-desktop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up /mnt storage
+        run: |
+          sudo mkdir -p /mnt/storage
+          sudo chmod 777 /mnt/storage
+          
+          mkdir -p /mnt/storage/android-sdk
+          mkdir -p /mnt/storage/android-avd
+          
+          df -h /mnt
+          
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo chmod 666 /dev/kvm 2>/dev/null || true
+          ls -la /dev/kvm
+
+      - name: Install KDE Plasma Desktop
+        run: |
+          echo "Installing KDE Plasma Desktop 🎨"
+          
+          sudo apt-get update
+          
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            kde-plasma-desktop \
+            plasma-nm \
+            plasma-workspace-wayland \
+            konsole \
+            dolphin \
+            kate \
+            firefox \
+            dbus-x11 \
+            fonts-noto-color-emoji \
+            wget \
+            curl \
+            net-tools \
+            htop \
+            openjdk-17-jdk \
+            unzip \
+            cpu-checker \
+            xserver-xorg-core \
+            x11-xserver-utils \
+            libpulse0 \
+            libxcb-randr0-dev \
+            libxcb-xtest0-dev \
+            libxcb-xinerama0-dev \
+            libxcb-shape0-dev \
+            libxcb-xkb-dev \
+            libxkbcommon-x11-0
+          
+          echo "✅ KDE Plasma installed"
+
+      - name: Install Android Command Line Tools
+        run: |
+          echo "📱 Installing Android SDK..."
+          
+          cd /mnt/storage/android-sdk
+          
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdtools.zip
+          unzip -q cmdtools.zip
+          rm cmdtools.zip
+          
+          mkdir -p cmdline-tools/latest
+          mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true
+          
+          echo "✅ Android SDK installed"
+
+      - name: Set Android Environment Variables
+        run: |
+          echo "ANDROID_HOME=/mnt/storage/android-sdk" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=/mnt/storage/android-sdk" >> $GITHUB_ENV
+          echo "ANDROID_AVD_HOME=/mnt/storage/android-avd" >> $GITHUB_ENV
+          echo "/mnt/storage/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "/mnt/storage/android-sdk/platform-tools" >> $GITHUB_PATH
+          echo "/mnt/storage/android-sdk/emulator" >> $GITHUB_PATH
+          
+          mkdir -p ~/.profile.d
+          cat > ~/.profile.d/android.sh << 'EOFENV'
+          export ANDROID_HOME=/mnt/storage/android-sdk
+          export ANDROID_SDK_ROOT=/mnt/storage/android-sdk
+          export ANDROID_AVD_HOME=/mnt/storage/android-avd
+          export PATH=$PATH:/mnt/storage/android-sdk/cmdline-tools/latest/bin
+          export PATH=$PATH:/mnt/storage/android-sdk/platform-tools
+          export PATH=$PATH:/mnt/storage/android-sdk/emulator
+          export PATH=$PATH:/mnt/storage/android-sdk/build-tools/34.0.0
+          EOFENV
+
+      - name: Install Android SDK Components
+        run: |
+          export ANDROID_HOME=/mnt/storage/android-sdk
+          export ANDROID_SDK_ROOT=/mnt/storage/android-sdk
+          export PATH=$PATH:/mnt/storage/android-sdk/cmdline-tools/latest/bin
+          
+          cd /mnt/storage/android-sdk
+          
+          echo "📦 Installing SDK components..."
+          
+          yes | cmdline-tools/latest/bin/sdkmanager --licenses
+          
+          cmdline-tools/latest/bin/sdkmanager \
+            "platform-tools" \
+            "platforms;android-34" \
+            "platforms;android-33" \
+            "build-tools;34.0.0" \
+            "emulator" \
+            "system-images;android-34;google_apis;x86_64"
+          
+          echo "✅ SDK components installed"
+
+      - name: Download Android Studio
+        run: |
+          echo "💿 Downloading Android Studio 2025.2.1..."
+          
+          cd /mnt/storage
+          
+          wget -q https://redirector.gvt1.com/edgedl/android/studio/ide-zips/2025.2.1.7/android-studio-2025.2.1.7-linux.tar.gz -O android-studio.tar.gz
+          
+          tar -xzf android-studio.tar.gz
+          rm android-studio.tar.gz
+          
+          echo "✅ Android Studio extracted"
+
+      - name: Configure Android Studio
+        run: |
+          mkdir -p ~/.config/Google/AndroidStudio2025.2
+          
+          cat > ~/.config/Google/AndroidStudio2025.2/idea.properties << 'EOFPROPS'
+          android.sdk.path=/mnt/storage/android-sdk
+          avd.home=/mnt/storage/android-avd
+          EOFPROPS
+          
+          mkdir -p ~/.local/share/applications
+          cat > ~/.local/share/applications/android-studio.desktop << 'EOFDESKTOP'
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=Android Studio 2025.2.1
+          Icon=/mnt/storage/android-studio/bin/studio.png
+          Exec=/mnt/storage/android-studio/bin/studio.sh
+          Comment=Android Development IDE
+          Categories=Development;IDE;
+          Terminal=false
+          StartupWMClass=jetbrains-studio
+          EOFDESKTOP
+          
+          chmod +x ~/.local/share/applications/android-studio.desktop
+
+      - name: Install RustDesk
+        run: |
+          echo "🦀 Installing RustDesk..."
+          
+          # Download latest RustDesk
+          wget -q https://github.com/rustdesk/rustdesk/releases/download/1.3.3/rustdesk-1.3.3-x86_64.deb -O rustdesk.deb
+          
+          sudo apt install -y ./rustdesk.deb
+          rm rustdesk.deb
+          
+          echo "✅ RustDesk installed"
+
+      - name: Configure RustDesk for Headless
+        run: |
+          echo "⚙️ Configuring RustDesk..."
+          
+          # Enable headless mode (no physical display required)
+          rustdesk --option allow-linux-headless Y
+          
+          # Set password
+          rustdesk --password "${{ secrets.RUSTDESK_PASSWORD }}"
+          
+          # Configure to use your VPS server
+          rustdesk --config '{"custom-rendezvous-server":"159.195.6.61","relay-server":"159.195.6.61","api-server":"","key":"${{ secrets.RUSTDESK_KEY }}"}'
+          
+          echo "✅ RustDesk configured"
+
+      - name: Start X11 Server
+        run: |
+          echo "🖥️ Starting X11 server..."
+          
+          # Start X server in virtual framebuffer
+          sudo Xorg :0 -config /dev/null &
+          export DISPLAY=:0
+          
+          # Wait for X to start
+          sleep 5
+          
+          echo "✅ X11 server started"
+
+      - name: Start KDE Plasma
+        run: |
+          export DISPLAY=:0
+          export XDG_SESSION_TYPE=x11
+          export XDG_SESSION_DESKTOP=KDE
+          export XDG_CURRENT_DESKTOP=KDE
+          export DESKTOP_SESSION=plasma
+          
+          # Load Android environment
+          source ~/.profile.d/android.sh
+          
+          # Disable screen locking
+          kwriteconfig5 --file kscreenlockerrc --group Daemon --key Autolock false
+          kwriteconfig5 --file kscreenlockerrc --group Daemon --key LockOnResume false
+          
+          # Start Plasma
+          startplasma-x11 &
+          
+          sleep 10
+          
+          echo "✅ KDE Plasma started"
+
+      - name: Start RustDesk Service
+        run: |
+          echo "🚀 Starting RustDesk service..."
+          
+          export DISPLAY=:0
+          
+          # Start RustDesk service
+          rustdesk --service &
+          
+          sleep 5
+          
+          # Get RustDesk ID
+          RUSTDESK_ID=$(rustdesk --get-id)
+          
+          echo ""
+          echo "╔═══════════════════════════════════════════════════════╗"
+          echo "║  🦀 RUSTDESK + KDE PLASMA + ANDROID STUDIO READY! 🦀  ║"
+          echo "╠═══════════════════════════════════════════════════════╣"
+          echo "║                                                       ║"
+          echo "║  🆔 RustDesk ID: $RUSTDESK_ID                         ║"
+          echo "║  🔑 Password: (from secrets.RUSTDESK_PASSWORD)        ║"
+          echo "║  🌐 Server: 159.195.6.61                              ║"
+          echo "║  🖥️  Desktop: KDE Plasma                               ║"
+          echo "║  ⚡ Latency: 50-100ms (5-10x faster than VNC!)        ║"
+          echo "║                                                       ║"
+          echo "║  📱 Android Studio: 2025.2.1 Otter                    ║"
+          echo "║  📂 Location: /mnt/storage/android-studio             ║"
+          echo "║                                                       ║"
+          echo "║  🔌 Connection Steps:                                 ║"
+          echo "║  1. Open RustDesk on your device                      ║"
+          echo "║  2. Settings → Network → Set:                         ║"
+          echo "║     - ID Server: 159.195.6.61                         ║"
+          echo "║     - Relay Server: 159.195.6.61                      ║"
+          echo "║     - Key: (from secrets.RUSTDESK_KEY)                ║"
+          echo "║  3. Enter ID: $RUSTDESK_ID                            ║"
+          echo "║  4. Click Connect                                     ║"
+          echo "║                                                       ║"
+          echo "╚═══════════════════════════════════════════════════════╝"
+          echo ""
+
+      - name: Keep Alive with Monitoring
+        run: |
+          echo "🟢 SESSION ACTIVE"
+          
+          COUNT=0
+          while true; do
+            COUNT=$((COUNT + 1))
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "📊 Status Check #${COUNT} - $(date '+%H:%M:%S')"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            # Check RustDesk
+            if pgrep -f "rustdesk" > /dev/null; then
+              echo "✅ RustDesk: Running"
+              RUSTDESK_ID=$(rustdesk --get-id 2>/dev/null || echo "Getting ID...")
+              echo "🆔 Current ID: $RUSTDESK_ID"
+            else
+              echo "⚠️  RustDesk: Restarting..."
+              rustdesk --service &
+              sleep 3
+            fi
+            
+            # Check X Server
+            if pgrep -f "Xorg.*:0" > /dev/null; then
+              echo "✅ X Server: Running"
+            else
+              echo "⚠️  X Server: Down"
+            fi
+            
+            # Check KDE
+            if pgrep -f "plasmashell" > /dev/null; then
+              echo "✅ KDE Plasma: Running"
+            fi
+            
+            # Check Android Studio
+            if pgrep -f "android-studio" > /dev/null; then
+              echo "📱 Android Studio: Running"
+            fi
+            
+            # Resources
+            echo "💾 Root: $(df -h / | tail -1 | awk '{print $5 " used"}')"
+            echo "💾 /mnt: $(df -h /mnt | tail -1 | awk '{print $5 " used (" $4 " free)"}')"
+            echo "🧠 Memory: $(free -h | grep Mem | awk '{print $3 "/" $2}')"
+            
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+            
+            sleep 180
+          done
